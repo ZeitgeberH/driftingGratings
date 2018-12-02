@@ -1,2 +1,1 @@
-# ZeitgeberH.github.io
-Personal blog pages
+# drifting gratings for visual psychophysics and physilogy experiments
