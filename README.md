@@ -1,2 +1,2 @@
-# driftingGratings
-simple drifting gratings in a webpage using PIXI
+# ZeitgeberH.github.io
+Personal blog pages

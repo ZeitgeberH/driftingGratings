@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="single drifting grating for visual physiology experiments">
+    <link rel="icon" href="images/brain.png">
+    <title>PIXI-Drifting Grating</title>
+    <script src="src/pixi.min.js"></script>
+  </head>
+  <body>
+    <!-- <div id="input" contenteditable="true">Tap here to activate soft keyboard</div> -->
+    <noscript>
+      Please enable JavaScript to view this website.
+    </noscript>
+    <script>
+        //Aliases
+        let Application = PIXI.Application,
+            Container = PIXI.Container,
+            loader = PIXI.loader,
+            resources = PIXI.loader.resources,
+            TextureCache = PIXI.utils.TextureCache,
+            Sprite = PIXI.Sprite,
+            Graphics = PIXI.Graphics,
+            w = window.innerWidth,
+            h = window.innerHeight;
+            pointerX = 0;
+            pointerY = 0;
+        //Create a Pixi Application
+        let app = new Application({
+            width: w,
+            height: h,
+            antialiasing: true,
+            transparent: false,
+            resolution: 1
+          }
+        );
+        // Fullscreen in pixi is resizing the renderer to be window.innerWidth by window.innerHeight
+        window.addEventListener("resize", function() {
+          app.renderer.resize(window.innerWidth, window.innerHeight);
+          w = window.innerWidth,
+          h = window.innerHeight;
+          drawAll(); // master draw function
+        });
+        window.addEventListener("close", function() {
+          app.renderer.destroy();
+        });
+
+        window.addEventListener("click", function() {
+            pointerX = mouse.x;
+            pointerY = mouse.y;
+            drawAll();
+        });
+        window.addEventListener("touchstart", handleTouchStart, false);
+
+        document.body.appendChild(app.view);
+
+        var target = document.getElementsByTagName("input")[0];
+
+        var mouse = app.renderer.plugins.interaction.mouse.global;
+        var state;
+        var sizeOfGrating=800;
+        var sf=0.015; // cycle per pixel
+        var tf=10;  // cycle per second;
+        var shiftPerFrame= tf/sf/60;
+        var pixPerCycle=Math.ceil(2/sf);
+        let grating = new Container();
+        var movDistance=0;
+        var mask = new Graphics();
+        var maskSize=100;
+        var info = new PIXI.Text('Orientation: 0  SF: 0.015, TF: 10', { fontSize:'12pt',fontStyle:'bold',fontFamily: 'Arial', fill: 'white' });
+        var fps=new PIXI.Text('FPS:', { fontSize:'12pt',fontStyle:'bold',fontFamily: 'Arial', fill: 'red' });
+        var help = new PIXI.Text('Left / Right arrow change Orientation. \n'
+        +'Up / Down arrow key change Spatial frequency.\n'
+        +'Z / X  key change temporal frequency.\n'
+        +'A / S key to change size of grating.\n'
+        +'Mouse click to move grating'
+        , { fontSize:'12pt',fontStyle:'bold',fontFamily: 'Arial', fill: 'white' });
+
+        setup();
+
+        // Functions
+        function drawAll(){
+            drawGrating();
+            drawMask();
+            drawInfo();
+            drawHelp();
+        }
+
+        function handleTouchStart(evt){
+          evt.preventDefault();
+          var touches = evt.changedTouches;
+          pointerX = touches[0].pageX;
+          pointerY = touches[0].pageY;
+          // if (evt.target != target) {
+          //     target.focus();
+          //     target.click();
+          // };
+          drawAll();
+        };
+
+        function GunToHex(gunVal) {
+          hex = Number(gunVal).toString(16);
+          if (hex.length < 2) {
+            hex = "0" + hex;
+          }
+          return hex
+        };
+
+        function fullColorHex(r,g,b) {
+          var red = GunToHex(r);
+          var green = GunToHex(g);
+          var blue = GunToHex(b);
+          return "0x" +red+green+blue;
+        };
+
+        function initiGratingPos(){
+
+            grating.x=pointerX;
+            grating.y=pointerY;
+        };
+
+        function drawGrating(){
+              for (var i = app.stage.children.length - 1; i >= 0; i--) {
+                app.stage.removeChild(app.stage.children[i]);
+              };
+
+              for (var i = grating.children.length - 1; i >= 0; i--) {
+                grating.removeChild(grating.children[i]);
+              };
+              grating.mask=null;
+              // app.stage.clear;
+              for (let i = 0; i < sizeOfGrating/2; i++) {
+                  let line = new Graphics();
+                  let lum = Math.round(128 + 126*Math.sin(2*Math.PI*sf*i));
+                  line.lineStyle(3, fullColorHex(lum,lum,lum), 1);
+                  line.moveTo(i, 0);
+                  line.lineTo(i, sizeOfGrating);
+                  line.x = i;
+                  line.y = sizeOfGrating/2;
+                  grating.addChild(line);
+                }
+
+                grating.pivot.x = grating.width / 2;
+                grating.pivot.y = grating.height;
+
+                grating.position.set(w/2-sizeOfGrating/2, 0);
+                // grating.x = mouse.x-sizeOfGrating/2;
+                // grating.y = mouse.y-sizeOfGrating;
+                initiGratingPos();
+                grating.vx =0;
+                grating.vy =0;
+              app.stage.addChild(grating);
+        }
+
+        function drawMask(){
+                    mask.clear();
+                    mask.beginFill(0xFFFFFF);
+                    mask.drawCircle(pointerX, pointerY, maskSize);
+                    mask.endFill();
+                    mask.lineStyle(0);
+                    mask.position.x = w/ 2;
+                    mask.position.y = h/ 2;
+                    //app.stage.addChild(mask);
+                    grating.mask=mask;
+                    // app.stage.on('click', onClick);
+                    // app.stage.on('tap', onClick);
+        };
+
+        function drawHelp(){
+                    help.position.y = 10;
+                    help.position.x = 10;
+                    app.stage.addChild(help);
+                    fps.position.y = h -40;
+                    fps.position.x =  10;
+                    app.stage.addChild(fps);
+        };
+
+        function drawInfo(){
+            info.position.y = h-60;
+            info.position.x = 10;
+
+            info.text='Direction: '+Math.round((360-grating.rotation*180/Math.PI)%360)
+                +'.  SF:' + Math.round(sf*100)/100 +'. TF:'+tf+ '. Center('+ Math.round(pointerX) + ', ' + Math.round(pointerY)+')'+'. Size: '+maskSize;
+            app.stage.addChild(info);
+        }
+
+        function setup() {
+          //Create the `grating` sprite
+          app.stage.interactive = true;
+          drawAll();
+          //Capture the keyboard keys
+          let left = keyboard(37),
+              up = keyboard(38),
+              right = keyboard(39),
+              down = keyboard(40);
+              xKey = keyboard(88),
+              zKey = keyboard(90);
+              aKey = keyboard(65);
+              sKey = keyboard(83);
+
+          aKey.press = () => {
+            maskSize += 6;
+            drawAll();
+          };
+
+          sKey.press = () => {
+            maskSize -= 6;
+            drawAll();
+          };
+
+          //Left arrow key `press` method
+          xKey.press = () => {
+            //Change the grating's mask size when the key is pressed
+            tf -= 0.5;
+            if (tf <0.1){
+             tf=0.1;
+            }
+            info.text='Direction: '+Math.round((360-grating.rotation*180/Math.PI)%360)
+                +'  SF:' + Math.round(sf*100)/100 +'  TF:'+tf;
+            shiftPerFrame = tf /sf/60;
+          };
+          zKey.press = () => {
+            //Change the grating's mask size when the key is pressed
+            tf += 0.5;
+            shiftPerFrame = tf /sf/60;
+            info.text='Direction: '+Math.round((360-grating.rotation*180/Math.PI)%360)
+                    +'  SF:' + Math.round(sf*100)/100 +'  TF:'+tf ;
+          };
+
+          //Left arrow key `press` method
+          left.press = () => {
+            //Change the grating's velocity when the key is pressed
+            grating.rotation -= 5*Math.PI/180;
+            info.text='Direction: '+Math.round((360-grating.rotation*180/Math.PI)%360)
+                    +'  SF:' + Math.round(sf*100)/100 +'  TF:'+tf;
+          };
+          //Up
+          up.press = () => {
+            sf += 0.002;
+            pixPerCycle=Math.round(2/sf);
+            shiftPerFrame = tf /sf/60;
+            drawAll();
+          };
+
+          //Right
+          right.press = () => {
+            grating.rotation += 5*Math.PI/180;
+        info.text='Direction: '+Math.round((360-grating.rotation*180/Math.PI)%360)
+                +'  SF:' + Math.round(sf*100)/100 +'  TF:'+tf;
+          };
+
+          //Down
+          down.press = () => {
+            sf -= 0.002;
+            if (sf<0){
+              sf=0;
+            }
+            pixPerCycle=Math.round(2/sf);
+            shiftPerFrame = tf /sf/60;
+            drawAll();
+          };
+          //Set the game state
+          state = play;
+          //Start the game loop
+          app.ticker.add(delta => gameLoop(delta));
+        }
+
+        function gameLoop(delta){
+          //Update the current game state:
+          state(delta);
+        }
+
+        function play(delta) {
+          //Use the grating's velocity to make it move
+          //grating.pivot.set(mouse.x,  mouse.y);
+            movDistance += shiftPerFrame;
+            if (movDistance > pixPerCycle){
+                    movDistance=0;
+                    initiGratingPos();
+            }
+            //drawMask(mouse.x,mouse.y,maskSize);
+           grating.x +=shiftPerFrame*Math.cos(grating.rotation);//movDistance*Math.sin(grating.orientation); //mouse.x;
+           grating.y +=shiftPerFrame*Math.sin(grating.rotation); //movDistance*Math.cos(grating.orientation);// mouse.y;
+           fps.text = 'FPS: ' +  Math.round(app.ticker.FPS*10)/10;
+        }
+        //The `keyboard` helper function
+        function keyboard(keyCode) {
+          var key = {};
+          key.code = keyCode;
+          key.isDown = false;
+          key.isUp = true;
+          key.press = undefined;
+          key.release = undefined;
+          //The `downHandler`
+          key.downHandler = event => {
+            if (event.keyCode === key.code) {
+              if (key.isUp && key.press) key.press();
+              key.isDown = true;
+              key.isUp = false;
+            }
+            event.preventDefault();
+          };
+
+          //The `upHandler`
+          key.upHandler = event => {
+            if (event.keyCode === key.code) {
+              if (key.isDown && key.release) key.release();
+              key.isDown = false;
+              key.isUp = true;
+            }
+            event.preventDefault();
+          };
+
+          //Attach event listeners
+          window.addEventListener(
+            "keydown", key.downHandler.bind(key), false
+          );
+          window.addEventListener(
+            "keyup", key.upHandler.bind(key), false
+          );
+          return key;
+        }
+    </script>
+  </body>
+</html>
